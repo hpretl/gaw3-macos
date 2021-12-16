@@ -290,7 +290,6 @@ SockCon *con_accept(SockCon *pser, int checkFlags)
 SockCon *con_acquire( int domain, int sockType, int proto, int checkflags )
 {
    SockCon *cnx;
-   
    cnx = con_new( NULL, domain, sockType, proto, 0, CON_ACQUIRE);
    cnx->s = dup(0); /* 0 in daemon mode */;
    fdsel_set_fd((FdescSelect *) cnx, cnx->s );

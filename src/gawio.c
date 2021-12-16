@@ -137,19 +137,42 @@ static int aio_coldata_process( GawIoData *gawio, char *pline )
    return 0;
 }
 
+static char *color; /* stefan */
+static GdkRGBA usercolor; /* stefan */
+
+/* stefan replica of datafile_similar_var_add(), adds color info  */
+static void
+datafile_similar_var_add_w_color (gpointer d, gpointer p)
+{
+   WaveVar *curvar = (WaveVar *) d;
+   WaveVar *var = (WaveVar *) p;
+
+   if ( app_strcmp(curvar->varName, var->varName) == 0 ) { 
+      #if 0   /* stefan: option for setting color only on first variable */
+      if( curvar->tblno > 0 ) 
+        ap_panel_add_var(NULL, curvar, NULL, NULL);
+      else 
+      #endif
+        ap_panel_add_var(NULL, curvar, NULL, color ? &usercolor : NULL);
+   }
+}
 
 static int aio_copyvar( GawIoData *gawio, char *pline )
 {
-   static GdkRGBA usercolor; /* stefan */
+   char *panel; /* stefan */
+   int panelno=-1;
+   WavePanel *wp;
+
    msg_dbg("Fonction called %s", pline );
    UserData *ud = gawio->ud;
    
    char *varName = stu_token_next( &pline, " ", " " );
-   char *panel = stu_token_next( &pline, " ", " " );
-   char *color = stu_token_next( &pline, " ", " " ); /* stefan */
    
-   int panelno = atoi(panel + 1);
-
+   panel = stu_token_next( &pline, " ", " " );
+   if(panel[0] == 'p') { /* stefan */
+      panelno = atoi(panel + 1);
+   }
+   color = stu_token_next( &pline, " ", " " ); /* stefan */
    /* stefan */
    if( color ) {
       unsigned int r,g,b,a;
@@ -165,13 +188,20 @@ static int aio_copyvar( GawIoData *gawio, char *pline )
    /* /stefan */
 
    WaveVar *var = ( WaveVar *) dataset_get_var_for_name(gawio->wds, varName );
-   WavePanel *wp =  (WavePanel *) g_list_nth_data (ud->panelList, panelno);
+   if(panelno != -1) wp =  (WavePanel *) g_list_nth_data (ud->panelList, panelno); /* stefan */
    
    if ( ! var ) {
       gawio->msg = g_strdup_printf( _("Variable %s not defined"), varName );
       return -1;
+   } else {
+     /* stefan replace single ap_panel_add_var() with loop that loads all 'similar' variables */
+     /* ap_panel_add_var(wp, var, NULL, color ? &usercolor : NULL); */  /* stefan */
+     DataFile *wdata = (DataFile *) wavetable_get_datafile((WaveTable *) var->wvtable); /* stefan add all similar vars */
+     if(panelno != -1) ud->selected_panel = g_list_nth_data (ud->panelList, panelno);
+     else if( ud->selected_panel == NULL) 
+       ud->selected_panel = g_list_nth_data (ud->panelList, 0); /* stefan force select 1st panel if no selected one*/
+     wavetable_foreach_wavevar(wdata->wt, datafile_similar_var_add_w_color, (gpointer) var); /* stefan */
    }
-   ap_panel_add_var(wp, var, NULL, color ? &usercolor : NULL); /* stefan */
    return 0;
 }
 
@@ -622,7 +652,7 @@ void aio_create_channel(UserData *ud)
    ud->gawio = (void *) gawio;
 
    SockCon *cnx = con_new( NULL, PF_INET, SOCK_STREAM, IPPROTO_IP,
-                           ud->listenPort, CON_BIND );
+                           ud->listenPort, CON_BIND | CON_REUSEAD ); /* stefan added CON_REUSEAD */
    if ( cnx->status < 0) {
       msg_errorl( 2, "Can't open socket" );
       con_destroy(cnx);

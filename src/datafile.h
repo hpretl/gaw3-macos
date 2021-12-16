@@ -16,7 +16,7 @@ typedef struct _DataFile DataFile;
 
 #include <appclass.h>
 #include <gaw.h>
-
+#include <regex.h>
 
 struct _DataFile {
    AppClass parent;
@@ -37,6 +37,8 @@ struct _DataFile {
    GSimpleActionGroup *group;  /* the vl menu action group */
    GtkWidget *vlmenu;         /*  vl menu  */
    GtkWidget *lbpopmenu;      /*  list button pop menu  */
+   GtkWidget *filter; /* filter field */
+   regex_t regex; /* regex of filter text */
 };
 
 /*
